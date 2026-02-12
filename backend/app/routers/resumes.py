@@ -1,6 +1,8 @@
 """Resume upload and management router."""
+import logging
+
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -8,6 +10,9 @@ from app.dependencies import get_current_user
 from app.models.user import User
 from app.models.resume import Resume
 from app.schemas.resume import ResumeResponse, ResumeListResponse
+from app.services.resume_service import ResumeService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -19,8 +24,6 @@ async def upload_resume(
     db: AsyncSession = Depends(get_db),
 ):
     """Upload and parse a resume file."""
-    # Validate file type
-    allowed_types = {"application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"}
     ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename else ""
     if ext not in ("pdf", "docx", "txt"):
         raise HTTPException(
@@ -35,27 +38,26 @@ async def upload_resume(
             detail="File must be under 10 MB",
         )
 
-    # TODO Phase 1: Upload to GCS, parse with ResumeFileParser + ResumeParser
-    # For now, store a placeholder
-    resume = Resume(
-        user_id=user.id,
-        file_url=f"pending://{file.filename}",
-        file_name=file.filename or "resume",
-        file_type=ext,
-        file_size_bytes=len(content),
-        is_active=True,
-    )
+    service = ResumeService(db)
+    try:
+        resume = await service.upload_and_parse(
+            user_id=user.id,
+            file_name=file.filename or "resume",
+            file_data=content,
+            content_type=file.content_type or "application/octet-stream",
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.exception("Resume upload failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to parse resume. Please try a different file.",
+        )
 
-    # Deactivate previous resumes
-    await db.execute(
-        update(Resume)
-        .where(Resume.user_id == user.id, Resume.is_active == True)
-        .values(is_active=False)
-    )
-
-    db.add(resume)
-    await db.flush()
-    await db.refresh(resume)
     return resume
 
 

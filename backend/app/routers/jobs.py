@@ -12,6 +12,7 @@ from app.schemas.job import (
     JobResponse, JobListResponse, JobStatsResponse,
     BookmarkUpdate, AppliedUpdate,
 )
+from app.services.job_service import JobService
 
 router = APIRouter()
 

@@ -13,6 +13,7 @@ from app.schemas.scrape import (
     ScrapeConfigCreate, ScrapeConfigUpdate, ScrapeConfigResponse,
     ScrapeRunTrigger, ScrapeRunResponse, ScrapeRunStatusResponse,
 )
+from app.services.scrape_service import ScrapeService
 
 router = APIRouter()
 
