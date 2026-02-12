@@ -25,43 +25,24 @@ async def list_jobs(
     remote_only: bool = False,
     min_score: float | None = None,
     recommendation: str | None = None,
-    sort_by: str = Query("last_seen", pattern="^(last_seen|match_score|company|title)$"),
-    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
+    sort_by: str = Query("date", pattern="^(date|score|company)$"),
     search: str | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List jobs with filters and pagination."""
-    query = select(Job).where(Job.user_id == user.id)
-
-    if company:
-        query = query.where(Job.company == company)
-    if remote_only:
-        query = query.where(Job.is_remote == True)
-    if min_score is not None:
-        query = query.where(Job.match_score >= min_score)
-    if recommendation:
-        query = query.where(Job.recommendation == recommendation)
-    if search:
-        query = query.where(Job.title.ilike(f"%{search}%"))
-
-    # Count total
-    count_query = select(func.count()).select_from(query.subquery())
-    total = (await db.execute(count_query)).scalar() or 0
-
-    # Sort
-    sort_col = getattr(Job, sort_by)
-    if sort_order == "desc":
-        query = query.order_by(sort_col.desc())
-    else:
-        query = query.order_by(sort_col.asc())
-
-    # Paginate
-    query = query.offset((page - 1) * per_page).limit(per_page)
-
-    result = await db.execute(query)
-    jobs = result.scalars().all()
-
+    service = JobService(db)
+    jobs, total = await service.list_jobs(
+        user.id,
+        page=page,
+        per_page=per_page,
+        company=company,
+        remote_only=remote_only,
+        min_score=min_score,
+        recommendation=recommendation,
+        sort_by=sort_by,
+        search=search,
+    )
     return JobListResponse(jobs=jobs, total=total, page=page, per_page=per_page)
 
 
@@ -71,31 +52,9 @@ async def get_stats(
     db: AsyncSession = Depends(get_db),
 ):
     """Get summary stats for the current user's jobs."""
-    base = select(Job).where(Job.user_id == user.id)
-
-    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
-    strong = (await db.execute(
-        select(func.count()).where(Job.user_id == user.id, Job.recommendation == "strong")
-    )).scalar() or 0
-    moderate = (await db.execute(
-        select(func.count()).where(Job.user_id == user.id, Job.recommendation == "moderate")
-    )).scalar() or 0
-    weak = total - strong - moderate
-    remote = (await db.execute(
-        select(func.count()).where(Job.user_id == user.id, Job.is_remote == True)
-    )).scalar() or 0
-    companies = (await db.execute(
-        select(func.count(func.distinct(Job.company))).where(Job.user_id == user.id)
-    )).scalar() or 0
-    latest = (await db.execute(
-        select(func.max(Job.last_seen)).where(Job.user_id == user.id)
-    )).scalar()
-
-    return JobStatsResponse(
-        total_jobs=total, strong_matches=strong, moderate_matches=moderate,
-        weak_matches=weak, remote_jobs=remote, companies=companies,
-        latest_scrape=latest,
-    )
+    service = JobService(db)
+    stats = await service.get_stats(user.id)
+    return stats
 
 
 @router.get("/companies", response_model=list[str])
@@ -104,12 +63,8 @@ async def get_companies(
     db: AsyncSession = Depends(get_db),
 ):
     """Get distinct company names."""
-    result = await db.execute(
-        select(func.distinct(Job.company))
-        .where(Job.user_id == user.id)
-        .order_by(Job.company)
-    )
-    return [row[0] for row in result.all()]
+    service = JobService(db)
+    return await service.get_companies(user.id)
 
 
 @router.get("/{job_id}", response_model=JobResponse)
@@ -119,10 +74,8 @@ async def get_job(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a single job's full details."""
-    result = await db.execute(
-        select(Job).where(Job.id == job_id, Job.user_id == user.id)
-    )
-    job = result.scalar_one_or_none()
+    service = JobService(db)
+    job = await service.get_job(user.id, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
@@ -136,15 +89,10 @@ async def toggle_bookmark(
     db: AsyncSession = Depends(get_db),
 ):
     """Toggle bookmark on a job."""
-    result = await db.execute(
-        select(Job).where(Job.id == job_id, Job.user_id == user.id)
-    )
-    job = result.scalar_one_or_none()
+    service = JobService(db)
+    job = await service.update_bookmark(user.id, job_id, body.is_bookmarked)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    job.is_bookmarked = body.is_bookmarked
-    await db.flush()
-    await db.refresh(job)
     return job
 
 
