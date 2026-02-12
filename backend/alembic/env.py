@@ -1,8 +1,13 @@
 """Alembic migration environment."""
+import sys
+from pathlib import Path
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from alembic import context
+
+# Add backend directory to Python path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import all models so Alembic sees them
 from app.db.base import Base
