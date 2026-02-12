@@ -50,16 +50,20 @@ class JobScraperOrchestrator:
     - Error handling and logging
     """
 
-    def __init__(self, llm=None, headless: bool = True):
+    def __init__(self, llm=None, headless: bool = True, db_adapter=None):
         """
         Initialize the orchestrator with all agents.
 
         Args:
             llm: Shared LLM instance for all agents
             headless: Whether to run browser in headless mode
+            db_adapter: Optional database adapter for multi-user dedup queries.
+                        Must implement get_known_job_urls(company) and
+                        get_known_job_keys(company). Defaults to the SQLite db module.
         """
         self.llm = llm
         self.headless = headless
+        self.db_adapter = db_adapter
 
         # Initialize agents
         self.company_discovery = CompanyDiscoveryAgent(llm)
@@ -177,8 +181,9 @@ class JobScraperOrchestrator:
 
             # Load known jobs for this company (for dedup / early exit)
             try:
-                context.known_job_urls = jobs_db.get_known_job_urls(company_name)
-                context.known_job_keys = jobs_db.get_known_job_keys(company_name)
+                db = self.db_adapter or jobs_db
+                context.known_job_urls = db.get_known_job_urls(company_name)
+                context.known_job_keys = db.get_known_job_keys(company_name)
                 known_count = len(context.known_job_urls) + len(context.known_job_keys)
                 if known_count:
                     self._log(f"Loaded {known_count} known jobs for dedup")
