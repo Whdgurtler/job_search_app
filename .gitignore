@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+
+# Database
+*.db
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+nul
+Thumbs.db
+.DS_Store
+
+# Pytest
+.pytest_cache/
+
+# Claude
+.claude/
+
+# Output files
+*.json
+!app_config.yaml
+
+# Flutter
+mobile/.dart_tool/
+mobile/.packages
+mobile/build/
