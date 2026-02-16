@@ -6,13 +6,14 @@ from pathlib import Path
 
 from google.cloud import storage
 
-from ..config import settings
+from ..config import get_settings
 
 
 class StorageService:
     """Handles file uploads/downloads to Google Cloud Storage."""
 
     def __init__(self):
+        self.settings = get_settings()
         self._client: storage.Client | None = None
         self._bucket: storage.Bucket | None = None
 
@@ -25,7 +26,7 @@ class StorageService:
     @property
     def bucket(self) -> storage.Bucket:
         if self._bucket is None:
-            self._bucket = self.client.bucket(settings.GCS_BUCKET_NAME)
+            self._bucket = self.client.bucket(self.settings.gcs_bucket_name)
         return self._bucket
 
     def upload_resume(self, user_id: str, file_name: str, file_data: bytes, content_type: str) -> str:
@@ -85,6 +86,7 @@ class LocalStorageService:
 
 def get_storage_service() -> StorageService | LocalStorageService:
     """Factory: returns GCS in production, local filesystem in dev."""
-    if settings.GCS_BUCKET_NAME:
+    settings = get_settings()
+    if settings.gcs_bucket_name:
         return StorageService()
     return LocalStorageService()

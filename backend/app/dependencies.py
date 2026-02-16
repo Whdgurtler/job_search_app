@@ -1,4 +1,5 @@
 """Shared FastAPI dependencies."""
+import os
 import uuid
 from fastapi import Depends, HTTPException, status
 from sqlalchemy import select
@@ -14,6 +15,15 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Get or create the current user from Firebase token claims."""
+    # TEST MODE: Bypass Firebase auth for local testing
+    if os.getenv("ENVIRONMENT") == "development":
+        result = await db.execute(
+            select(User).where(User.email == "test@example.com")
+        )
+        user = result.scalar_one_or_none()
+        if user:
+            return user
+    
     firebase_uid = firebase_claims["uid"]
 
     result = await db.execute(
