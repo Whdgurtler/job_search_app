@@ -1,15 +1,23 @@
-FROM python:3.11-slim
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install system deps
+# Install build deps in builder stage only
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python deps (slim API-only requirements)
+COPY backend/requirements-api.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements-api.txt
+
+# --- Final stage ---
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /install /usr/local
 
 # Copy backend code
 COPY backend/ /app/backend/

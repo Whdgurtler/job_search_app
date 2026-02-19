@@ -1,0 +1,22 @@
+# Ignore everything not needed for backend
+flutter/
+mobile/
+docs/
+.venv/
+.git/
+.github/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+!.env.example
+*.md
+*.bat
+*.ps1
+node_modules/
+.dart_tool/
+build/
+*.aab
+*.apk
+*.jks
