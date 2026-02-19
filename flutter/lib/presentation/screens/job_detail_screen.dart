@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/job_provider.dart';
 
@@ -60,10 +59,10 @@ class JobDetailScreen extends ConsumerWidget {
                             Text(job.location),
                           ],
                         ),
-                        if (job.postedDate != null) ...[
+                        if (job.displayDate != null) ...[
                           const SizedBox(height: 4),
                           Text(
-                            'Posted ${DateFormat.yMMMd().format(job.postedDate!)}',
+                            'Posted ${job.displayDate!}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
@@ -72,43 +71,50 @@ class JobDetailScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
+                if (job.matchScore > 0)
+                  _buildInfoCard(
+                    context,
+                    'Match Score',
+                    '${(job.matchScore * 100).round()}%',
+                    Icons.star,
+                  ),
+                if (job.isRemote)
+                  _buildInfoCard(context, 'Remote', 'Yes', Icons.home_work),
                 if (job.salary != null)
-                  _buildInfoCard(
-                    context,
-                    'Salary',
-                    job.salary!,
-                    Icons.attach_money,
-                  ),
+                  _buildInfoCard(context, 'Salary', job.salary!, Icons.attach_money),
                 if (job.employmentType != null)
-                  _buildInfoCard(
-                    context,
-                    'Employment Type',
-                    job.employmentType!,
-                    Icons.work,
-                  ),
+                  _buildInfoCard(context, 'Employment Type', job.employmentType!, Icons.work),
                 if (job.experienceLevel != null)
-                  _buildInfoCard(
-                    context,
-                    'Experience Level',
-                    job.experienceLevel!,
-                    Icons.bar_chart,
-                  ),
-                if (job.skills != null && job.skills!.isNotEmpty) ...[
+                  _buildInfoCard(context, 'Experience Level', job.experienceLevel!, Icons.bar_chart),
+                if (job.recommendation.isNotEmpty)
+                  _buildInfoCard(context, 'Recommendation', job.recommendation, Icons.thumb_up),
+                if (job.matchedSkills.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  Text(
-                    'Required Skills',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text('Matched Skills', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: job.skills!
-                        .map(
-                          (skill) => Chip(
-                            label: Text(skill),
-                          ),
-                        )
+                    children: job.matchedSkills
+                        .map((skill) => Chip(
+                              label: Text(skill),
+                              backgroundColor: Colors.green.withOpacity(0.1),
+                            ))
+                        .toList(),
+                  ),
+                ],
+                if (job.missingSkills.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text('Skills to Develop', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: job.missingSkills
+                        .map((skill) => Chip(
+                              label: Text(skill),
+                              backgroundColor: Colors.orange.withOpacity(0.1),
+                            ))
                         .toList(),
                   ),
                 ],
@@ -127,14 +133,14 @@ class JobDetailScreen extends ConsumerWidget {
                   ),
                 ],
                 const SizedBox(height: 24),
-                if (job.applicationUrl != null)
+                if (job.url != null && job.url!.isNotEmpty)
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () async {
-                        final url = Uri.parse(job.applicationUrl!);
-                        if (await canLaunchUrl(url)) {
-                          await launchUrl(url, mode: LaunchMode.externalApplication);
+                        final uri = Uri.parse(job.url!);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
                         } else {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

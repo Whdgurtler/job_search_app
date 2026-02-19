@@ -9,6 +9,7 @@ from datetime import date, datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.job import Job
@@ -56,17 +57,36 @@ class PostgresDBAdapter:
             f"{row[1]}|||{row[2]}" for row in rows if row[1]
         }
 
+    @staticmethod
+    def _parse_posting_date(raw) -> date | None:
+        """Parse posting_date from scraper output into a date object."""
+        if raw is None:
+            return None
+        if isinstance(raw, date):
+            return raw
+        if isinstance(raw, datetime):
+            return raw.date()
+        if isinstance(raw, str):
+            raw = raw.strip()
+            for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%B %d, %Y", "%b %d, %Y"):
+                try:
+                    return datetime.strptime(raw, fmt).date()
+                except ValueError:
+                    continue
+        return None
+
     async def save_jobs(self, jobs: list[dict], scraped_date: str | None = None) -> dict:
         """Save scraped jobs to PostgreSQL with upsert logic.
 
-        Returns {"inserted": int, "updated": int}.
+        Returns {"inserted": int, "updated": int, "skipped": int}.
         """
         if not scraped_date:
             scraped_date = date.today().isoformat()
 
         inserted = 0
         updated = 0
-        now = datetime.now(timezone.utc)
+        skipped = 0
+        today = date.today()
 
         for job_data in jobs:
             url = job_data.get("url", "")
@@ -99,7 +119,7 @@ class PostgresDBAdapter:
 
             if existing:
                 # Update existing job
-                existing.last_seen = now
+                existing.last_seen = today
                 existing.match_score = job_data.get("match_score", existing.match_score)
                 existing.skill_match = job_data.get("skill_match", existing.skill_match)
                 existing.level_match = job_data.get("level_match", existing.level_match)
@@ -108,36 +128,45 @@ class PostgresDBAdapter:
                 existing.matched_skills = job_data.get("matched_skills", existing.matched_skills)
                 existing.missing_skills = job_data.get("missing_skills", existing.missing_skills)
                 existing.scraped_date = scraped_date
+                # Backfill posting_date if we have it now and didn't before
+                parsed_date = self._parse_posting_date(job_data.get("posting_date"))
+                if parsed_date and not existing.posting_date:
+                    existing.posting_date = parsed_date
                 updated += 1
             else:
                 # Insert new job
-                job = Job(
-                    user_id=self.user_id,
-                    title=title,
-                    company=company,
-                    location=location,
-                    is_remote=job_data.get("is_remote", False),
-                    url=url or None,
-                    description=job_data.get("description"),
-                    department=job_data.get("department"),
-                    source=job_data.get("source"),
-                    posting_date=job_data.get("posting_date"),
-                    first_seen=now,
-                    last_seen=now,
-                    match_score=job_data.get("match_score"),
-                    skill_match=job_data.get("skill_match"),
-                    level_match=job_data.get("level_match"),
-                    recommendation=job_data.get("recommendation"),
-                    level_assessment=job_data.get("level_assessment"),
-                    matched_skills=job_data.get("matched_skills", []),
-                    missing_skills=job_data.get("missing_skills", []),
-                    scraped_date=scraped_date,
-                )
-                self.db.add(job)
-                inserted += 1
+                try:
+                    job = Job(
+                        user_id=self.user_id,
+                        title=title,
+                        company=company,
+                        location=location,
+                        is_remote=job_data.get("is_remote", False),
+                        url=url or None,
+                        description=job_data.get("description"),
+                        department=job_data.get("department"),
+                        source=job_data.get("source"),
+                        posting_date=self._parse_posting_date(job_data.get("posting_date")),
+                        first_seen=today,
+                        last_seen=today,
+                        match_score=job_data.get("match_score"),
+                        skill_match=job_data.get("skill_match"),
+                        level_match=job_data.get("level_match"),
+                        recommendation=job_data.get("recommendation"),
+                        level_assessment=job_data.get("level_assessment"),
+                        matched_skills=job_data.get("matched_skills", []),
+                        missing_skills=job_data.get("missing_skills", []),
+                        scraped_date=scraped_date,
+                    )
+                    self.db.add(job)
+                    await self.db.flush()
+                    inserted += 1
+                except IntegrityError:
+                    await self.db.rollback()
+                    skipped += 1
 
         await self.db.commit()
-        return {"inserted": inserted, "updated": updated}
+        return {"inserted": inserted, "updated": updated, "skipped": skipped}
 
     def clear_cache(self) -> None:
         """Clear pre-loaded caches (call between companies)."""

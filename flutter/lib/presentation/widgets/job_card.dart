@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../domain/entities/job_entity.dart';
+
+Color _matchColor(double score) {
+  if (score >= 0.75) return Colors.green;
+  if (score >= 0.5) return Colors.orange;
+  return Colors.red;
+}
 
 class JobCard extends StatelessWidget {
   final JobEntity job;
@@ -88,13 +93,29 @@ class JobCard extends StatelessWidget {
                   ],
                 ),
               ],
-              if (job.postedDate != null) ...[
+              if (job.displayDate != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Posted ${DateFormat.yMMMd().format(job.postedDate!)}',
+                  'Posted ${job.displayDate!}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.outline,
                       ),
+                ),
+              ],
+              if (job.matchScore > 0) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.star, size: 16, color: _matchColor(job.matchScore)),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${(job.matchScore * 100).round()}% match',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: _matchColor(job.matchScore),
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
                 ),
               ],
             ],

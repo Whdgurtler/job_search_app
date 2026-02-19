@@ -1,7 +1,7 @@
 """Job request/response schemas."""
 import uuid
 from datetime import date, datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 
 class JobResponse(BaseModel):
@@ -24,6 +24,12 @@ class JobResponse(BaseModel):
     last_seen: date
     is_bookmarked: bool
     is_applied: bool
+
+    @computed_field
+    @property
+    def display_date(self) -> date:
+        """Job posting date if available, otherwise the date it was first scraped."""
+        return self.posting_date or self.first_seen
 
     model_config = {"from_attributes": True}
 
