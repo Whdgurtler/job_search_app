@@ -1,0 +1,102 @@
+# Google Cloud Build configuration for deploying to Cloud Run
+# Usage:
+#   gcloud builds submit --config backend/cloudbuild.yaml .
+#
+# Prerequisites:
+#   1. Enable Cloud Run, Cloud Build, and Artifact Registry APIs
+#   2. Create a Cloud SQL PostgreSQL instance
+#   3. Create a Redis (Memorystore) instance
+#   4. Set up secrets in Secret Manager
+
+steps:
+  # Build the API image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'backend/Dockerfile.api'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/jobsearch-api:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/jobsearch-api:latest'
+      - '.'
+
+  # Build the Worker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'backend/Dockerfile.worker'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/jobsearch-worker:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/jobsearch-worker:latest'
+      - '.'
+
+  # Push API image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/jobsearch-api']
+
+  # Push Worker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/jobsearch-worker']
+
+  # Deploy API to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'jobsearch-api'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/jobsearch-api:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8000'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '3'
+      - '--set-env-vars'
+      - 'ENVIRONMENT=production'
+
+  # Deploy Worker to Cloud Run (always-on)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'jobsearch-worker'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/jobsearch-worker:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--no-allow-unauthenticated'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '1'
+      - '--max-instances'
+      - '2'
+      - '--set-env-vars'
+      - 'ENVIRONMENT=production'
+
+substitutions:
+  _REGION: us-central1
+  _REPO: jobsearch
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/jobsearch-api'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/jobsearch-worker'

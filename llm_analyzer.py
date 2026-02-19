@@ -3,7 +3,7 @@ from typing import Dict, Optional
 import anthropic
 import openai
 from config import (
-    ANTHROPIC_API_KEY, OPENAI_API_KEY, HUGGINGFACE_API_KEY,
+    ANTHROPIC_API_KEY, OPENAI_API_KEY, HUGGINGFACE_API_KEY, MOONSHOT_API_KEY,
     LLM_PROVIDER, LLM_MODEL, USE_LOCAL_MODEL, DEVICE
 )
 
@@ -30,10 +30,15 @@ class LLMAnalyzer:
             self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         elif provider == "openai":
             self.client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        elif provider == "kimi":
+            self.client = openai.OpenAI(
+                api_key=MOONSHOT_API_KEY,
+                base_url="https://api.moonshot.cn/v1"
+            )
         elif provider == "huggingface":
             if USE_LOCAL_MODEL and not _check_hf_available():
                 raise ImportError("transformers and torch are required for local HuggingFace models. Install with: pip install transformers torch")
-            
+
             if USE_LOCAL_MODEL:
                 print(f"Loading HuggingFace model: {model}...")
                 self._init_local_model()
@@ -96,6 +101,14 @@ class LLMAnalyzer:
             )
             return response.choices[0].message.content
         
+        elif self.provider == "kimi":
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens
+            )
+            return response.choices[0].message.content
+
         elif self.provider == "huggingface":
             if USE_LOCAL_MODEL and self.hf_pipeline:
                 # Local model inference

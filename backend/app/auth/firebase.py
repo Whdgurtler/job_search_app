@@ -4,9 +4,13 @@ from firebase_admin import credentials, auth
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.config import get_settings
+import logging
+
+logger = logging.getLogger(__name__)
+logger.info(f"[FIREBASE MODULE LOADED] environment={get_settings().environment}")
 
 _app = None
-_bearer_scheme = HTTPBearer()
+_bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def init_firebase():
@@ -50,7 +54,15 @@ def verify_firebase_token(token: str) -> dict:
 
 
 async def get_firebase_user(
-    cred: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
-) -> dict:
+    cred: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> dict | None:
     """FastAPI dependency that verifies the Bearer token and returns Firebase claims."""
+    from app.config import get_settings
+    settings = get_settings()
+    logger.info(f"[get_firebase_user] env={settings.environment}, cred={cred}")
+    # Skip Firebase auth in development mode
+    if settings.environment == "development":
+        return None
+    if not cred:
+        return None
     return verify_firebase_token(cred.credentials)

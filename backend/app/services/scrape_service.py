@@ -112,10 +112,15 @@ class ScrapeService:
     async def trigger_scrape(
         self,
         user_id: UUID,
-        config_id: UUID,
+        config_id: UUID | None = None,
+        companies: list[str] | None = None,
+        keywords: str | None = None,
+        employment_areas: list[str] | None = None,
     ) -> ScrapeRun | None:
         """Create a pending scrape run and dispatch to Celery.
 
+        Accepts an optional config_id to load defaults from, plus optional
+        overrides (companies, keywords, employment_areas).
         Returns None if quota exhausted.
         """
         # Check user quota
@@ -123,10 +128,15 @@ class ScrapeService:
         if not user or user.scrape_quota_remaining <= 0:
             return None
 
-        # Verify config exists
-        config = await self.get_config(user_id, config_id)
-        if not config:
-            return None
+        # Load config defaults if provided, allow overrides
+        run_companies = companies or []
+        run_keywords = keywords or ""
+        if config_id:
+            config = await self.get_config(user_id, config_id)
+            if not config:
+                return None
+            run_companies = companies if companies else list(config.companies or [])
+            run_keywords = keywords if keywords else (config.keywords or "")
 
         # Decrement quota
         user.scrape_quota_remaining -= 1
@@ -137,8 +147,8 @@ class ScrapeService:
             config_id=config_id,
             status="pending",
             scraped_date=date.today().isoformat(),
-            companies=config.companies,
-            keywords=config.keywords,
+            companies=run_companies,
+            keywords=run_keywords,
         )
         self.db.add(run)
         await self.db.commit()
@@ -177,6 +187,20 @@ class ScrapeService:
             )
         )
         return result.scalar_one_or_none()
+
+    async def get_run_status(self, user_id: UUID, run_id: UUID) -> dict | None:
+        """Get lightweight status data for a scrape run (used by polling endpoint)."""
+        run = await self.get_run(user_id, run_id)
+        if not run:
+            return None
+        return {
+            "id": run.id,
+            "status": run.status,
+            "progress": run.progress,
+            "total_jobs": run.total_jobs,
+            "new_jobs": run.new_jobs,
+            "duration_seconds": run.duration_seconds,
+        }
 
     async def update_run_status(
         self,

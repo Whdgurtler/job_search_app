@@ -52,3 +52,17 @@ app.include_router(scrapes.router, prefix="/api/v1", tags=["scrapes"])
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "version": settings.api_version}
+
+
+@app.get("/health/worker")
+async def worker_health_check():
+    """Check if the Celery worker and Redis broker are reachable."""
+    from app.tasks.celery_app import celery_app
+    try:
+        result = celery_app.control.ping(timeout=3.0)
+        workers = [name for resp in result for name in resp]
+        if workers:
+            return {"status": "ok", "workers": workers}
+        return {"status": "degraded", "detail": "No workers responded"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}

@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -19,14 +19,14 @@ RUN CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+') && \
     rm /tmp/chromedriver.zip
 
 # Install Python deps
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy all code
-COPY . /app/backend/
-COPY ../agents /app/agents
-COPY ../llm_analyzer.py ../resume_parser.py ../resume_file_parser.py \
-     ../config.py ../company_discovery.py ../db.py /app/
+COPY backend/ /app/backend/
+COPY agents/ /app/agents/
+COPY llm_analyzer.py resume_parser.py resume_file_parser.py \
+     config.py company_discovery.py db.py /app/
 
 WORKDIR /app/backend
 

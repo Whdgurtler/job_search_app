@@ -1,6 +1,5 @@
 """Scrape config and run management router."""
 from uuid import UUID
-from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +15,12 @@ from app.schemas.scrape import (
 from app.services.scrape_service import ScrapeService
 
 router = APIRouter()
+
+
+@router.get("/test")
+async def test_endpoint():
+    """Test endpoint with no auth"""
+    return {"status": "ok", "message": "API is working"}
 
 
 # --- Scrape Configs ---
@@ -95,7 +100,7 @@ async def trigger_scrape(
 ):
     """Trigger a manual scrape (async via Celery)."""
     service = ScrapeService(db)
-    
+
     try:
         run = await service.trigger_scrape(
             user_id=user.id,
@@ -104,6 +109,11 @@ async def trigger_scrape(
             keywords=body.keywords,
             employment_areas=body.employment_areas,
         )
+        if not run:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not trigger scrape. Check quota and config.",
+            )
         return run
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

@@ -1,13 +1,18 @@
 """Celery task that runs the job scraper orchestrator for a user."""
 
 import asyncio
+import logging
 import sys
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
+from celery.exceptions import SoftTimeLimitExceeded
+
 from app.tasks.celery_app import celery_app
+
+logger = logging.getLogger(__name__)
 
 # Add project root so we can import existing agents
 PROJECT_ROOT = str(Path(__file__).resolve().parents[3])
@@ -78,7 +83,7 @@ async def _save_jobs_for_user(user_id: str, jobs: list, scraped_date: str):
         return await adapter.save_jobs(jobs, scraped_date=scraped_date)
 
 
-@celery_app.task(bind=True, name="run_scrape", max_retries=1)
+@celery_app.task(bind=True, name="run_scrape", max_retries=2, default_retry_delay=60)
 def run_scrape(self, run_id: str, user_id: str, config_id: str):
     """Execute a full scrape run for a user.
 
@@ -91,6 +96,11 @@ def run_scrape(self, run_id: str, user_id: str, config_id: str):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     start_time = time.time()
+
+    # Track partial results for graceful timeout handling
+    all_jobs = []
+    errors = []
+    completed_companies = 0
 
     try:
         # Mark as running
@@ -120,10 +130,6 @@ def run_scrape(self, run_id: str, user_id: str, config_id: str):
         employment_areas = context["employment_areas"]
         resume_data = context["resume_data"]
         today = date.today().isoformat()
-
-        all_jobs = []
-        errors = []
-        completed_companies = 0
 
         if companies:
             results = orchestrator.search_multiple_companies(
@@ -198,8 +204,58 @@ def run_scrape(self, run_id: str, user_id: str, config_id: str):
             "duration": duration,
         }
 
+    except SoftTimeLimitExceeded:
+        # Gracefully save partial results before the hard limit kills us
+        duration = time.time() - start_time
+        logger.warning(
+            f"Scrape run {run_id} hit soft time limit after {duration:.0f}s. "
+            f"Saving {len(all_jobs)} partial results."
+        )
+        save_result = {"inserted": 0, "updated": 0}
+        if all_jobs:
+            today = date.today().isoformat()
+            try:
+                save_result = loop.run_until_complete(
+                    _save_jobs_for_user(user_id, all_jobs, today)
+                )
+            except Exception:
+                logger.exception("Failed to save partial results on timeout")
+
+        errors.append({"error": f"Task timed out after {duration:.0f}s"})
+        loop.run_until_complete(_update_run(
+            run_id,
+            status="completed",
+            total_jobs=len(all_jobs),
+            new_jobs=save_result["inserted"],
+            updated_jobs=save_result["updated"],
+            errors=errors,
+            duration_seconds=duration,
+            completed_at=datetime.now(timezone.utc),
+        ))
+        return {
+            "run_id": run_id,
+            "status": "completed",
+            "total_jobs": len(all_jobs),
+            "partial": True,
+        }
+
+    except (ConnectionError, OSError, TimeoutError) as exc:
+        # Transient errors — retry with backoff
+        duration = time.time() - start_time
+        logger.warning(
+            f"Scrape run {run_id} hit transient error (attempt {self.request.retries + 1}): {exc}"
+        )
+        loop.run_until_complete(_update_run(
+            run_id,
+            status="retrying",
+            errors=[{"error": str(exc), "attempt": self.request.retries + 1}],
+            duration_seconds=duration,
+        ))
+        raise self.retry(exc=exc, countdown=60 * (self.request.retries + 1))
+
     except Exception as exc:
         duration = time.time() - start_time
+        logger.exception(f"Scrape run {run_id} failed: {exc}")
         loop.run_until_complete(_update_run(
             run_id,
             status="failed",

@@ -8,16 +8,15 @@ load_dotenv()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY", "")  # Optional, for HF Inference API
+MOONSHOT_API_KEY = os.getenv("MOONSHOT_API_KEY", "")  # For Kimi / Moonshot AI
 
 # Model Configuration
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"  # Fast and good quality
-LLM_PROVIDER = "huggingface"  # "anthropic", "openai", or "huggingface"
-LLM_MODEL = "Qwen/Qwen2.5-72B-Instruct"  # Large model via HuggingFace Inference API
+LLM_PROVIDER = "huggingface"  # "anthropic", "openai", "huggingface", or "kimi"
+LLM_MODEL = "moonshotai/Kimi-K2.5"  # Kimi 2.5 via HuggingFace Inference API
 
-# Hugging Face Options
-# For large models (>7B params), use the Inference API (USE_LOCAL_MODEL = False)
-# For small models, local mode works — set True and pick e.g. "Qwen/Qwen2.5-7B-Instruct"
-USE_LOCAL_MODEL = False  # 72B model requires Inference API, too large for local
+# Hugging Face Options (only used when LLM_PROVIDER = "huggingface")
+USE_LOCAL_MODEL = False
 
 # Auto-detect device (GPU if available, otherwise CPU)
 # Lazy import to avoid slow torch load at startup

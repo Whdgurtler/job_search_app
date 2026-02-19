@@ -34,9 +34,12 @@ Thumbs.db
 
 # Output files
 *.json
+!railway.json
 !app_config.yaml
 
 # Flutter
 mobile/.dart_tool/
 mobile/.packages
 mobile/build/
+flutter/build/
+flutter/.dart_tool/
