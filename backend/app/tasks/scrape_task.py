@@ -116,9 +116,9 @@ def run_scrape(self, run_id: str, user_id: str, config_id: str):
         )
 
         # Set up LLM (reuse existing config)
-        from config import PROVIDER, MODEL
+        from config import LLM_PROVIDER, LLM_MODEL
         from llm_analyzer import LLMAnalyzer
-        llm = LLMAnalyzer(provider=PROVIDER, model=MODEL)
+        llm = LLMAnalyzer(provider=LLM_PROVIDER, model=LLM_MODEL)
 
         # Create orchestrator (sync — manages its own Selenium driver)
         from agents.orchestrator import JobScraperOrchestrator
