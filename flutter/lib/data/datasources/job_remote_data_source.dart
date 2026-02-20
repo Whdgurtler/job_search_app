@@ -43,8 +43,10 @@ class JobRemoteDataSourceImpl implements JobRemoteDataSource {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data['data'] ?? response.data;
-        return data.map((json) => JobModel.fromJson(json)).toList();
+        // Backend returns {"jobs": [...], "total": int, "page": int, "per_page": int}
+        final responseData = response.data;
+        final List<dynamic> jobs = responseData['jobs'] ?? responseData['data'] ?? [];
+        return jobs.map((json) => JobModel.fromJson(json as Map<String, dynamic>)).toList();
       } else {
         throw ServerException(
           'Failed to fetch jobs',
