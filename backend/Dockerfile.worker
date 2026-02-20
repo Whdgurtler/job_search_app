@@ -1,3 +1,15 @@
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements-worker.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements-worker.txt
+
+# --- Final stage ---
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -8,21 +20,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update && apt-get install -y google-chrome-stable \
+    && apt-get purge -y wget gnupg unzip curl \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install matching chromedriver
-RUN CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+') && \
-    wget -q "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}.0/linux64/chromedriver-linux64.zip" \
-    -O /tmp/chromedriver.zip && \
-    unzip /tmp/chromedriver.zip -d /opt/ && \
-    ln -s /opt/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
-    rm /tmp/chromedriver.zip
+RUN apt-get update && apt-get install -y --no-install-recommends wget unzip \
+    && CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+') \
+    && wget -q "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}.0/linux64/chromedriver-linux64.zip" \
+       -O /tmp/chromedriver.zip \
+    && unzip /tmp/chromedriver.zip -d /opt/ \
+    && ln -s /opt/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
+    && rm /tmp/chromedriver.zip \
+    && apt-get purge -y wget unzip \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy installed Python packages from builder
+COPY --from=builder /install /usr/local
 
-# Copy all code
+# Copy code
 COPY backend/ /app/backend/
 COPY agents/ /app/agents/
 COPY llm_analyzer.py resume_parser.py resume_file_parser.py \
@@ -30,4 +47,4 @@ COPY llm_analyzer.py resume_parser.py resume_file_parser.py \
 
 WORKDIR /app/backend
 
-CMD ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+CMD ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info", "--concurrency=1"]
