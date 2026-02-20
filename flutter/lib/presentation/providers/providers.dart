@@ -33,7 +33,8 @@ final dioClientProvider = Provider<DioClient>((ref) {
 final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
   final firebaseAuth = ref.watch(firebaseAuthProvider);
   final prefs = ref.watch(sharedPreferencesProvider);
-  return AuthRemoteDataSourceImpl(firebaseAuth, prefs);
+  final client = ref.watch(dioClientProvider);
+  return AuthRemoteDataSourceImpl(firebaseAuth, prefs, client);
 });
 
 final jobRemoteDataSourceProvider = Provider<JobRemoteDataSource>((ref) {

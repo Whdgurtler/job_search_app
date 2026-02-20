@@ -47,8 +47,8 @@ class UserRemoteDataSourceImpl implements UserRemoteDataSource {
   }) async {
     try {
       final data = <String, dynamic>{
-        if (displayName != null) 'displayName': displayName,
-        if (phoneNumber != null) 'phoneNumber': phoneNumber,
+        if (displayName != null) 'display_name': displayName,
+        if (phoneNumber != null) 'phone_number': phoneNumber,
       };
 
       final response = await _client.put(
@@ -78,7 +78,7 @@ class UserRemoteDataSourceImpl implements UserRemoteDataSource {
       final response = await _client.uploadFile(
         AppConstants.resumeUploadEndpoint,
         filePath,
-        'resume',
+        'file',
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {

@@ -4,8 +4,9 @@ class AppConstants {
   static const String registerEndpoint = '/auth/register';
   static const String jobsEndpoint = '/jobs';
   static const String jobDetailsEndpoint = '/jobs/{id}';
-  static const String resumeUploadEndpoint = '/profile/resume';
-  static const String profileEndpoint = '/profile';
+  static const String resumeUploadEndpoint = '/resumes/upload';
+  static const String resumeListEndpoint = '/resumes';
+  static const String profileEndpoint = '/users/me';
 
   // Scrape Endpoints
   static const String scrapeConfigsEndpoint = '/scrape-configs';

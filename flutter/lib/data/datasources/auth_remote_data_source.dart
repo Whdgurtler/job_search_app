@@ -1,7 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/errors/exceptions.dart';
+import '../../core/network/dio_client.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -26,8 +28,9 @@ abstract class AuthRemoteDataSource {
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseAuth _firebaseAuth;
   final SharedPreferences _prefs;
+  final DioClient _client;
 
-  AuthRemoteDataSourceImpl(this._firebaseAuth, this._prefs);
+  AuthRemoteDataSourceImpl(this._firebaseAuth, this._prefs, this._client);
 
   @override
   Future<UserModel> signInWithEmailAndPassword({
@@ -50,10 +53,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       await _prefs.setString(AppConstants.userIdKey, credential.user!.uid);
       await _prefs.setString(AppConstants.userEmailKey, credential.user!.email ?? '');
 
+      // Register with backend (idempotent — 409 means already registered)
+      await _registerWithBackend(email: email);
+
       return _userToModel(credential.user!);
     } on FirebaseAuthException catch (e) {
       throw AuthException(_getAuthErrorMessage(e.code));
     } catch (e) {
+      if (e is AuthException) rethrow;
       throw AuthException('Sign in failed: $e');
     }
   }
@@ -85,11 +92,38 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       await _prefs.setString(AppConstants.userIdKey, credential.user!.uid);
       await _prefs.setString(AppConstants.userEmailKey, credential.user!.email ?? '');
 
+      // Register with backend
+      await _registerWithBackend(
+        email: email,
+        displayName: displayName,
+      );
+
       return _userToModel(credential.user!);
     } on FirebaseAuthException catch (e) {
       throw AuthException(_getAuthErrorMessage(e.code));
     } catch (e) {
+      if (e is AuthException) rethrow;
       throw AuthException('Sign up failed: $e');
+    }
+  }
+
+  Future<void> _registerWithBackend({
+    required String email,
+    String? displayName,
+  }) async {
+    try {
+      await _client.post(
+        AppConstants.registerEndpoint,
+        data: {
+          'email': email,
+          if (displayName != null) 'display_name': displayName,
+        },
+      );
+    } on DioException catch (e) {
+      // 409 = already registered, that's fine
+      if (e.response?.statusCode == 409) return;
+      // Don't fail login/signup if backend registration fails
+      // The user can still use Firebase auth; backend will retry on next call
     }
   }
 
