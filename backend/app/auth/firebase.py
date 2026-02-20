@@ -1,4 +1,5 @@
 """Firebase Admin SDK initialization and token verification."""
+import json
 import firebase_admin
 from firebase_admin import credentials, auth
 from fastapi import HTTPException, status, Depends
@@ -21,6 +22,10 @@ def init_firebase():
     settings = get_settings()
     if settings.firebase_credentials_path:
         cred = credentials.Certificate(settings.firebase_credentials_path)
+        _app = firebase_admin.initialize_app(cred)
+    elif settings.firebase_credentials_json:
+        # Service account JSON passed as env var (for Railway/Heroku/etc.)
+        cred = credentials.Certificate(json.loads(settings.firebase_credentials_json))
         _app = firebase_admin.initialize_app(cred)
     elif settings.firebase_project_id:
         _app = firebase_admin.initialize_app(options={

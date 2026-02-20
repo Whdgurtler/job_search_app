@@ -31,6 +31,7 @@ class Settings(BaseSettings):
 
     # Firebase
     firebase_credentials_path: str = ""
+    firebase_credentials_json: str = ""  # Service account JSON as string (for Railway/Heroku)
     firebase_project_id: str = ""
 
     # Google Cloud Storage
