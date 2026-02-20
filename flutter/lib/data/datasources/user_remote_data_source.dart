@@ -123,10 +123,11 @@ class UserRemoteDataSourceImpl implements UserRemoteDataSource {
     } else if (e.type == DioExceptionType.connectionError) {
       throw NetworkException('No internet connection');
     } else {
-      throw ServerException(
-        e.response?.data['message'] ?? 'Server error',
-        e.response?.statusCode,
-      );
+      final data = e.response?.data;
+      final message = (data is Map)
+          ? (data['detail'] ?? data['message'] ?? 'Server error')
+          : 'Server error';
+      throw ServerException(message, e.response?.statusCode);
     }
   }
 }

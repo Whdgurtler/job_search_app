@@ -4,6 +4,14 @@ import '../../core/errors/exceptions.dart';
 import '../../core/network/dio_client.dart';
 import '../models/job_model.dart';
 
+String _extractErrorMessage(DioException e) {
+  final data = e.response?.data;
+  if (data is Map) {
+    return data['detail'] ?? data['message'] ?? 'Server error';
+  }
+  return 'Server error';
+}
+
 abstract class JobRemoteDataSource {
   Future<List<JobModel>> getJobs({
     int page = 1,
@@ -43,8 +51,8 @@ class JobRemoteDataSourceImpl implements JobRemoteDataSource {
       );
 
       if (response.statusCode == 200) {
-        // Backend returns {"jobs": [...], "total": int, "page": int, "per_page": int}
         final responseData = response.data;
+        if (responseData is! Map) return [];
         final List<dynamic> jobs = responseData['jobs'] ?? responseData['data'] ?? [];
         return jobs.map((json) => JobModel.fromJson(json as Map<String, dynamic>)).toList();
       } else {
@@ -61,10 +69,14 @@ class JobRemoteDataSourceImpl implements JobRemoteDataSource {
         throw NetworkException('No internet connection');
       } else {
         throw ServerException(
-          e.response?.data['message'] ?? 'Server error',
+          _extractErrorMessage(e),
           e.response?.statusCode,
         );
       }
+    } on ServerException {
+      rethrow;
+    } on NetworkException {
+      rethrow;
     } catch (e) {
       throw ServerException('Unexpected error: $e');
     }
@@ -77,7 +89,11 @@ class JobRemoteDataSourceImpl implements JobRemoteDataSource {
       final response = await _client.get(endpoint);
 
       if (response.statusCode == 200) {
-        return JobModel.fromJson(response.data['data'] ?? response.data);
+        final data = response.data;
+        if (data is Map<String, dynamic>) {
+          return JobModel.fromJson(data);
+        }
+        throw ServerException('Invalid response format');
       } else {
         throw ServerException(
           'Failed to fetch job details',
@@ -92,10 +108,14 @@ class JobRemoteDataSourceImpl implements JobRemoteDataSource {
         throw NetworkException('No internet connection');
       } else {
         throw ServerException(
-          e.response?.data['message'] ?? 'Server error',
+          _extractErrorMessage(e),
           e.response?.statusCode,
         );
       }
+    } on ServerException {
+      rethrow;
+    } on NetworkException {
+      rethrow;
     } catch (e) {
       throw ServerException('Unexpected error: $e');
     }
