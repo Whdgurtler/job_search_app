@@ -18,6 +18,18 @@ sys.path.insert(0, settings.project_root)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
+    # Create database tables if they don't exist
+    from app.db.base import Base
+    from app.db.session import engine
+    # Import all models so Base.metadata knows about them
+    import app.models.user  # noqa: F401
+    import app.models.job  # noqa: F401
+    import app.models.resume  # noqa: F401
+    import app.models.scrape  # noqa: F401
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("Database tables ensured.")
+
     # Initialize Firebase on startup
     try:
         init_firebase()
