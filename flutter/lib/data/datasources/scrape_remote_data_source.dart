@@ -142,9 +142,10 @@ class ScrapeRemoteDataSourceImpl implements ScrapeRemoteDataSource {
     } else if (e.type == DioExceptionType.connectionError) {
       return NetworkException('No internet connection');
     }
-    return ServerException(
-      e.response?.data?['detail'] ?? e.response?.data?['message'] ?? 'Server error',
-      e.response?.statusCode,
-    );
+    final data = e.response?.data;
+    final message = (data is Map)
+        ? (data['detail'] ?? data['message'] ?? 'Server error')
+        : 'Server error';
+    return ServerException(message, e.response?.statusCode);
   }
 }
