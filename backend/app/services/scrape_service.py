@@ -146,7 +146,7 @@ class ScrapeService:
             user_id=user_id,
             config_id=config_id,
             status="pending",
-            scraped_date=date.today().isoformat(),
+            scraped_date=date.today(),
             companies=run_companies,
             keywords=run_keywords,
         )

@@ -129,7 +129,7 @@ def run_scrape(self, run_id: str, user_id: str, config_id: str):
         keywords = context["keywords"]
         employment_areas = context["employment_areas"]
         resume_data = context["resume_data"]
-        today = date.today().isoformat()
+        today = date.today()
 
         if companies:
             results = orchestrator.search_multiple_companies(
@@ -213,7 +213,7 @@ def run_scrape(self, run_id: str, user_id: str, config_id: str):
         )
         save_result = {"inserted": 0, "updated": 0}
         if all_jobs:
-            today = date.today().isoformat()
+            today = date.today()
             try:
                 save_result = loop.run_until_complete(
                     _save_jobs_for_user(user_id, all_jobs, today)

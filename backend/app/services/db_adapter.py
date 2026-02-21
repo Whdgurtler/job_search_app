@@ -75,13 +75,13 @@ class PostgresDBAdapter:
                     continue
         return None
 
-    async def save_jobs(self, jobs: list[dict], scraped_date: str | None = None) -> dict:
+    async def save_jobs(self, jobs: list[dict], scraped_date: date | None = None) -> dict:
         """Save scraped jobs to PostgreSQL with upsert logic.
 
         Returns {"inserted": int, "updated": int, "skipped": int}.
         """
         if not scraped_date:
-            scraped_date = date.today().isoformat()
+            scraped_date = date.today()
 
         inserted = 0
         updated = 0
