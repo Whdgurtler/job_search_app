@@ -11,6 +11,14 @@ abstract class ScrapeRemoteDataSource {
   Future<ScrapeRunEntity> triggerScrape(Map<String, dynamic> data);
   Future<List<ScrapeRunEntity>> getRuns();
   Future<ScrapeRunStatusEntity> getRunStatus(String runId);
+  Future<List<CompanySuggestion>> getCompanySuggestions();
+}
+
+class CompanySuggestion {
+  final String name;
+  final String reason;
+
+  CompanySuggestion({required this.name, required this.reason});
 }
 
 class ScrapeRemoteDataSourceImpl implements ScrapeRemoteDataSource {
@@ -101,6 +109,26 @@ class ScrapeRemoteDataSourceImpl implements ScrapeRemoteDataSource {
       throw ServerException('Failed to fetch run status', response.statusCode);
     } on DioException catch (e) {
       throw _handleDioError(e);
+    }
+  }
+
+  @override
+  Future<List<CompanySuggestion>> getCompanySuggestions() async {
+    try {
+      final response = await _client.get(AppConstants.companySuggestionsEndpoint);
+      if (response.statusCode == 200) {
+        final List<dynamic> suggestions = response.data['suggestions'] ?? [];
+        return suggestions
+            .map((s) => CompanySuggestion(
+                  name: s['name'] ?? '',
+                  reason: s['reason'] ?? '',
+                ))
+            .where((s) => s.name.isNotEmpty)
+            .toList();
+      }
+      return [];
+    } on DioException {
+      return [];
     }
   }
 

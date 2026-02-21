@@ -61,6 +61,17 @@ async def upload_resume(
     return resume
 
 
+@router.get("/suggest-companies")
+async def suggest_companies(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Suggest companies based on the user's active resume."""
+    service = ResumeService(db)
+    suggestions = await service.get_company_suggestions(user.id)
+    return {"suggestions": suggestions}
+
+
 @router.get("", response_model=ResumeListResponse)
 async def list_resumes(
     user: User = Depends(get_current_user),

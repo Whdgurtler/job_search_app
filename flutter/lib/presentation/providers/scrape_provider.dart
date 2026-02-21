@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/datasources/scrape_remote_data_source.dart';
 import '../../domain/entities/scrape_entity.dart';
 import '../../domain/repositories/scrape_repository.dart';
 import 'providers.dart';
@@ -224,6 +225,12 @@ final scrapeConfigProvider =
     StateNotifierProvider<ScrapeConfigNotifier, ScrapeConfigState>((ref) {
   final repository = ref.watch(scrapeRepositoryProvider);
   return ScrapeConfigNotifier(repository);
+});
+
+final companySuggestionsProvider =
+    FutureProvider<List<CompanySuggestion>>((ref) async {
+  final dataSource = ref.watch(scrapeRemoteDataSourceProvider);
+  return dataSource.getCompanySuggestions();
 });
 
 final scrapeRunProvider =

@@ -8,8 +8,10 @@ class ResumeData(BaseModel):
     skills: List[str]
     experience_years: float
     current_title: str
+    current_company: str = ""
     current_level: str
     past_titles: List[str]
+    past_companies: List[str] = []
     industries: List[str]
     achievements: List[str]
     has_leadership_experience: bool
@@ -30,9 +32,11 @@ class ResumeParser:
 
 CRITICAL INSTRUCTIONS:
 - current_title: Extract ONLY the job title from the most recent position (e.g., "Data Scientist", "Senior Software Engineer", "Product Manager"). DO NOT include job descriptions or responsibilities.
+- current_company: The company name for the most recent position (e.g., "Google", "First Horizon Bank").
 - experience_years: Count total years of professional work experience (number only, e.g., 5.0)
 - education: Extract ALL degrees with field (e.g., ["MS Artificial Intelligence", "BS Mathematics"]). List BOTH Bachelor's AND Master's/PhD if present. Use format like "MS" or "Master of Science", not "m.s."
 - current_level: One of: Intern, Junior, Mid-Level, Senior, Staff, Principal, Team Lead, Manager, Senior Manager, Director, VP, C-Suite
+- past_companies: List of previous employer company names (not the current one).
 
 Resume:
 {resume_text[:3000]}
@@ -42,8 +46,10 @@ Return ONLY this JSON format (no markdown, no extra text):
   "skills": ["Python", "SQL", "Machine Learning"],
   "experience_years": 5.0,
   "current_title": "Senior Data Scientist",
+  "current_company": "Acme Corp",
   "current_level": "Senior",
   "past_titles": ["Data Analyst", "Junior Data Scientist"],
+  "past_companies": ["Previous Corp", "First Job Inc"],
   "industries": ["Technology", "Finance"],
   "achievements": ["Led team of 5", "Increased revenue by 20%"],
   "has_leadership_experience": true,

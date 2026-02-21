@@ -135,6 +135,70 @@ class ResumeService:
             await self.db.refresh(resume)
         return resume
 
+    async def get_company_suggestions(self, user_id: UUID) -> list[dict]:
+        """Generate company suggestions based on the user's active resume."""
+        resume = await self.get_active_resume(user_id)
+        if not resume or not resume.parsed_data:
+            return []
+
+        parsed = resume.parsed_data
+        industries = parsed.get("industries", [])
+        current_title = parsed.get("current_title", "")
+        current_company = parsed.get("current_company", "")
+        past_companies = parsed.get("past_companies", [])
+        past_titles = parsed.get("past_titles", [])
+        skills = parsed.get("skills", [])
+
+        if not industries and not current_title:
+            return []
+
+        context = f"Current title: {current_title}\n"
+        if current_company:
+            context += f"Most recent company: {current_company}\n"
+        if past_companies:
+            context += f"Previous companies: {', '.join(past_companies[:5])}\n"
+        if past_titles:
+            context += f"Past titles: {', '.join(past_titles[:5])}\n"
+        if industries:
+            context += f"Industries: {', '.join(industries)}\n"
+        if skills:
+            context += f"Key skills: {', '.join(skills[:10])}\n"
+
+        prompt = f"""Based on this candidate's background, suggest 10-15 companies they should target in their job search. Focus on companies that:
+1. Are in the same or adjacent industries as their most recent company
+2. Are similar in size and type to {current_company or 'companies they have worked at'} (e.g., if they worked at a regional bank, suggest other regional banks of similar size)
+3. Would value their specific skill set
+4. Include a mix of direct competitors and adjacent companies
+
+Candidate background:
+{context}
+
+Return ONLY a JSON array of objects, no other text:
+[
+  {{"name": "Company Name", "reason": "Brief reason why this is a good fit"}},
+  ...
+]"""
+
+        try:
+            from config import LLM_PROVIDER, LLM_MODEL
+            from llm_analyzer import LLMAnalyzer
+
+            llm = LLMAnalyzer(provider=LLM_PROVIDER, model=LLM_MODEL)
+            response = llm.analyze(prompt, max_tokens=1000)
+
+            if not response:
+                return []
+
+            import json
+            response = response.strip()
+            if response.startswith("```"):
+                response = response.split("\n", 1)[1].rsplit("```", 1)[0]
+            return json.loads(response)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Company suggestion failed: {e}")
+            return []
+
     async def delete_resume(self, user_id: UUID, resume_id: UUID) -> bool:
         """Delete a resume and its file from storage."""
         resume = await self.get_resume(user_id, resume_id)

@@ -6,6 +6,7 @@ class AppConstants {
   static const String jobDetailsEndpoint = '/jobs/{id}';
   static const String resumeUploadEndpoint = '/resumes/upload';
   static const String resumeListEndpoint = '/resumes';
+  static const String companySuggestionsEndpoint = '/resumes/suggest-companies';
   static const String profileEndpoint = '/users/me';
 
   // Scrape Endpoints
